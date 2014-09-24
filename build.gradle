@@ -1,0 +1,142 @@
+buildscript {
+    repositories {
+        maven { url "http://repo.spring.io/libs-milestone" }
+        mavenLocal()
+    }
+    dependencies { classpath("org.springframework.boot:spring-boot-gradle-plugin:1.1.6.RELEASE") }
+}
+
+apply plugin: 'java'
+apply plugin: "groovy"
+apply plugin: 'eclipse'
+apply plugin: 'build-dashboard'
+apply plugin: 'codenarc'
+apply from: './properties.gradle'
+apply plugin: 'spring-boot'
+apply plugin: 'war'
+apply plugin: 'sonar'
+
+sourceCompatibility = 1.8
+
+jar {
+    baseName = 'metamodelQueryDSL-poc'
+    version = '0.1.0'
+}
+
+war {
+    baseName = 'metamodelQueryDSL-poc'
+    version =  '0.1.0'
+}
+
+sonar {
+    server { url = "http://localhost:9000" }
+    database {
+        url = "jdbc:mysql://localhost:3306/sonar"
+        driverClassName = "com.mysql.jdbc.Driver"
+        username = "sonar"
+        password = "sonar"
+    }
+}
+
+
+sourceSets {
+    intTest
+    generated {
+        java { srcDirs = ['src/main/generated']}
+    }
+    main {
+        java { srcDir 'src/main/java' }
+        resources { srcDir 'src/main/resources' }
+    }
+    test {
+        java { srcDir 'src/test/java' }
+        resources { srcDir 'src/test/resources' }
+    }
+}
+
+
+repositories {
+    mavenCentral()
+    maven { url "http://repo.spring.io/libs-snapshot" }
+    maven { url "http://repo.codahale.com/" }
+}
+
+/*configurations {
+ providedRuntime
+ }*/
+
+dependencies {
+
+    compile("com.mysema.querydsl:querydsl-core:$queryDslVersion")
+    compile("com.mysema.querydsl:querydsl-jpa:$queryDslVersion")
+    compile("com.mysema.querydsl:querydsl-sql:$queryDslVersion")
+    compile("com.mysema.querydsl:querydsl-codegen:$queryDslVersion")
+    compile("com.mysema.querydsl:querydsl-apt:$queryDslVersion")
+    
+    compile ("org.codehaus.groovy:groovy:${groovyVersion}")
+    compile("org.springframework.boot:spring-boot-starter-actuator")
+    compile("org.springframework.boot:spring-boot-starter-data-jpa")
+    compile("org.springframework.boot:spring-boot-starter-logging")
+
+
+    compile ("org.springframework:spring-core:${springVersion}")
+    compile ("org.springframework:spring-beans:${springVersion}")
+    compile ("org.springframework:spring-context:${springVersion}")
+    compile ("org.springframework:spring-orm:${springVersion}")
+    compile ("org.springframework:spring-tx:${springVersion}")
+    compile ("org.springframework:spring-aop:${springVersion}")
+
+    compile ("org.springframework:spring-aspects:${springVersion}")
+
+    compile("org.projectlombok:lombok:${lombokVersion}")
+    compile("com.google.guava:guava:${guavaVersion}")
+    compile("net.sf.ehcache:ehcache:2.8.0")
+    //  providedRuntime("org.springframework.boot:spring-boot-starter-tomcat")
+    runtime("org.hsqldb:hsqldb:${hsqldbVersion}")
+    testCompile("org.hamcrest:hamcrest-all:$hamcrestVersion")
+    compile("org.mockito:mockito-all:$mockitoVersion")
+    testCompile("junit:junit:$junitVersion")
+    testCompile("org.openjdk.jmh:jmh-core:$jmhVersion")
+    testCompile("org.easytesting:fest-assert:${festAssertVersion}")
+    testCompile("com.googlecode.catch-exception:catch-exception:1.2.0")
+    testCompile ("org.springframework:spring-test:${springVersion}")
+    testCompile ("org.spockframework:spock-core:0.7-groovy-2.0")
+
+    testCompile("org.unitils:unitils-core:3.4.2")
+    testCompile("org.unitils:unitils-io:3.4.2");
+    testCompile("pl.pragmatists:JUnitParams:1.0.3")
+
+
+}
+uploadArchives {
+    repositories { flatDir { dirs 'repos' } }
+}
+
+task generateQueryDSL(type: JavaCompile, group: 'build', description: 'generate queryDSL') {
+    source = sourceSets.main.java
+    classpath = configurations.compile
+    options.compilerArgs = [
+        "-proc:only",
+        "-processor",
+        "com.mysema.query.apt.jpa.JPAAnnotationProcessor"
+    ]
+    destinationDir = sourceSets.generated.java.srcDirs.iterator().next()
+}
+
+
+compileJava {
+    dependsOn generateQueryDSL
+    source sourceSets.generated.java.srcDirs.iterator().next()
+}
+
+compileGeneratedJava {
+    dependsOn generateQueryDSL
+    options.warnings = true
+    classpath += sourceSets.main.runtimeClasspath
+}
+
+clean {
+    delete sourceSets.generated.java.srcDirs
+}
+
+task wrapper(type: Wrapper) { gradleVersion = '2.1' }
